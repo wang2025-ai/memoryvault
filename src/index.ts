@@ -1,0 +1,12 @@
+export type { EmbeddingConfig, VaultConfig } from './config.js';
+export { configPath, dbPath, defaultConfig, initVault, loadConfig, saveConfig, vaultHome } from './config.js';
+export { chunkText, extractTitle } from './chunk.js';
+export { ensureVecTable, getMeta, openDb, setMeta, vecTableExists } from './db.js';
+export type { Db } from './db.js';
+export { getProvider, OllamaProvider, OpenAIProvider } from './embeddings.js';
+export type { EmbeddingProvider } from './embeddings.js';
+export { embedPending, indexFolder, listFiles, removeDocument, upsertDocument } from './store.js';
+export type { AddResult, IndexSummary } from './store.js';
+export { makeSnippet, rrfFuse, search } from './search.js';
+export type { SearchHit, SearchMode } from './search.js';
+export { createMcpServer, SERVER_NAME, SERVER_VERSION, startMcpServer } from './mcp-server.js';

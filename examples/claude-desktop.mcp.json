@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "memoryvault": {
+      "command": "node",
+      "args": ["/absolute/path/to/memoryvault/bin/mvault.js", "serve"]
+    }
+  }
+}
