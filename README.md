@@ -27,13 +27,16 @@ npm install && npm run build
 # 1. initialize the vault (~/.memoryvault)
 node bin/mvault.js init
 
-# 2. index your notes (recursively, .md/.markdown/.txt/.json)
+# 2. index your notes (recursively: .md/.txt/.json/.pdf/.html)
 node bin/mvault.js index ~/notes
 
-# 3. search it from the terminal
+# 3. keep folders in sync as you edit (optional)
+node bin/mvault.js watch ~/notes
+
+# 4. search it from the terminal
 node bin/mvault.js search "rate limiting"
 
-# 4. expose it to your AI via MCP
+# 5. expose it to your AI via MCP
 node bin/mvault.js serve
 ```
 
@@ -87,11 +90,19 @@ Ollama keeps embeddings fully local; OpenAI sends chunk text to the API (your ca
 | `mvault init` | Initialize `~/.memoryvault/` (config + database) |
 | `mvault add <files...>` / `add -t "text"` | Add documents, auto-chunked |
 | `mvault index <folder>` | Recursively index a folder (`--ext`, `--no-recursive`) |
+| `mvault watch <folders...>` | Live-sync folders: index edits, remove deleted files |
 | `mvault search <query>` | Hybrid search (`-n`, `--mode auto\|lexical\|vector`, `--json`) |
+| `mvault rm <refs...>` | Remove documents by id or source-path suffix |
 | `mvault reembed` | Embed chunks that don't have vectors yet |
 | `mvault status` | Stats: documents / chunks / vectors / provider |
 | `mvault config --embedding ollama` | Update configuration |
 | `mvault serve` | Start the MCP server (stdio) |
+
+Every search result cites its origin as `path:line`, so the AI (and you) can jump straight to the source. All commands support `--json` for scripting.
+
+## Landing page
+
+`site/index.html` is a self-contained, dependency-free landing page (hero, how-it-works, MCP config copy button, waitlist form). Deploy it to Cloudflare Pages / Netlify / GitHub Pages as-is, then set `WAITLIST_ENDPOINT` in the file to your Formspree endpoint or Pages Function to collect signups.
 
 Custom vault location: set the `MEMORYVAULT_HOME` environment variable.
 
@@ -111,8 +122,8 @@ Custom vault location: set the `MEMORYVAULT_HOME` environment variable.
 
 ## Roadmap
 
-- [ ] `mvault watch` — incremental indexing of a folder
-- [ ] PDF / HTML ingestion
+- [x] `mvault watch` — incremental indexing of folders
+- [x] PDF / HTML ingestion, line-number citation anchors
 - [ ] Vault Cloud sync (paid) — multi-device, encrypted
 - [ ] Browser extension: "save to memory"
 - [ ] Shared team vaults

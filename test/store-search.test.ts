@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { openDb, vecTableExists, type Db } from '../src/db.js';
 import type { EmbeddingProvider } from '../src/embeddings.js';
 import type { VaultConfig } from '../src/config.js';
-import { embedPending, indexFolder, upsertDocument } from '../src/store.js';
+import { embedPending, findDocRef, indexFolder, removeDocument, upsertDocument } from '../src/store.js';
 import { rrfFuse, search, type SearchHit } from '../src/search.js';
 
 const cfgNone: VaultConfig = { embedding: { provider: 'none' } };
@@ -50,7 +50,15 @@ describe('lexical search (provider: none)', () => {
     const hits = await search(db, cfgNone, 'database');
     expect(hits.length).toBeGreaterThan(0);
     expect(hits[0].title).toBe('Databases');
+    expect(hits[0].line).toBe(1);
     expect(hits[0].matchedBy).toContain('lexical');
+  });
+
+  it('anchors chunks to their source line', async () => {
+    addDoc('/notes/anchor.md', `# Anchor\n\n${'a'.repeat(1000)}\n\nzebra lives in this paragraph`);
+    const hits = await search(db, cfgNone, 'zebra lives');
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits[0].line).toBe(5); // line 1 heading, line 3 big paragraph (force-split), line 5 the zebra paragraph
   });
 
   it('finds Chinese documents via FTS trigram', async () => {
@@ -83,11 +91,27 @@ describe('upsert semantics', () => {
     addDoc('/notes/replace.md', 'original alpha content');
     addDoc('/notes/replace.md', 'replacement beta content');
     const docs = (db.prepare('SELECT COUNT(*) AS n FROM documents').get() as { n: number }).n;
-    expect(docs).toBe(4); // db.md, ml.md, mcp.md, replace.md
+    expect(docs).toBe(5); // db.md, ml.md, mcp.md, anchor.md, replace.md
     const old = await search(db, cfgNone, 'alpha');
     expect(old).toHaveLength(0);
     const fresh = await search(db, cfgNone, 'beta');
     expect(fresh).toHaveLength(1);
+  });
+
+  it('removes documents by id, exact source or suffix', async () => {
+    addDoc('/notes/tmp/rm-me.md', 'removable content about quokkas');
+    const bySuffix = findDocRef(db, 'rm-me.md');
+    expect(bySuffix).toBeDefined();
+    const byId = findDocRef(db, String(bySuffix!.id));
+    expect(byId!.source).toBe(bySuffix!.source);
+    expect(findDocRef(db, 'does-not-exist.md')).toBeUndefined();
+
+    removeDocument(db, byId!.id);
+    expect(await search(db, cfgNone, 'quokkas')).toHaveLength(0);
+    // the FTS index must be clean too
+    const ftsRows = (db.prepare('SELECT COUNT(*) AS n FROM chunks_fts').get() as { n: number }).n;
+    const chunkRows = (db.prepare('SELECT COUNT(*) AS n FROM chunks').get() as { n: number }).n;
+    expect(ftsRows).toBe(chunkRows);
   });
 });
 

@@ -9,6 +9,8 @@ export interface SearchHit {
   source: string;
   title: string;
   seq: number;
+  /** 1-based line number of the chunk start in the source file */
+  line: number;
   content: string;
   score: number;
   matchedBy: Array<'lexical' | 'vector'>;
@@ -19,6 +21,7 @@ interface Row {
   doc_id: number;
   seq: number;
   content: string;
+  start_line: number;
   source: string;
   title: string;
 }
@@ -43,7 +46,7 @@ function lexicalRows(db: Db, query: string, limit: number): Row[] {
     try {
       return db
         .prepare(
-          `SELECT chunks.id, chunks.doc_id, chunks.seq, chunks.content, documents.source, documents.title
+          `SELECT chunks.id, chunks.doc_id, chunks.seq, chunks.content, chunks.start_line, documents.source, documents.title
            FROM chunks_fts
            JOIN chunks ON chunks.id = chunks_fts.rowid
            JOIN documents ON documents.id = chunks.doc_id
@@ -59,7 +62,7 @@ function lexicalRows(db: Db, query: string, limit: number): Row[] {
   const needle = q.replace(/([\\%_])/g, '\\$1');
   const rows = db
     .prepare(
-      `SELECT chunks.id, chunks.doc_id, chunks.seq, chunks.content, documents.source, documents.title
+      `SELECT chunks.id, chunks.doc_id, chunks.seq, chunks.content, chunks.start_line, documents.source, documents.title
        FROM chunks
        JOIN documents ON documents.id = chunks.doc_id
        WHERE chunks.content LIKE '%' || ? || '%' ESCAPE '\\'
@@ -85,7 +88,7 @@ function vectorRows(db: Db, queryVector: number[], limit: number): Row[] {
   const placeholders = ids.map(() => '?').join(',');
   const rows = db
     .prepare(
-      `SELECT chunks.id, chunks.doc_id, chunks.seq, chunks.content, documents.source, documents.title
+      `SELECT chunks.id, chunks.doc_id, chunks.seq, chunks.content, chunks.start_line, documents.source, documents.title
        FROM chunks
        JOIN documents ON documents.id = chunks.doc_id
        WHERE chunks.id IN (${placeholders})`
@@ -144,6 +147,7 @@ export async function search(
     source: row.source,
     title: row.title,
     seq: row.seq,
+    line: row.start_line,
     content: row.content,
     score,
     matchedBy,

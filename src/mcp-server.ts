@@ -8,7 +8,7 @@ import { makeSnippet, search } from './search.js';
 import { embedPending, upsertDocument } from './store.js';
 
 export const SERVER_NAME = 'memoryvault';
-export const SERVER_VERSION = '0.1.0';
+export const SERVER_VERSION = '0.2.0';
 
 export function createMcpServer(db: Db, cfg: VaultConfig): McpServer {
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
@@ -33,7 +33,7 @@ export function createMcpServer(db: Db, cfg: VaultConfig): McpServer {
       const body = hits
         .map(
           (h, i) =>
-            `[${i + 1}] ${h.title} — ${h.source} (chunk ${h.seq + 1}, ${h.matchedBy.join('+')})\n${makeSnippet(h.content, query)}`
+            `[${i + 1}] ${h.title} — ${h.source}:${h.line} (chunk ${h.seq + 1}, ${h.matchedBy.join('+')})\n${makeSnippet(h.content, query)}`
         )
         .join('\n\n');
       return { content: [{ type: 'text', text: body }] };

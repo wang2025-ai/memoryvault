@@ -23,7 +23,8 @@ export function openDb(path: string): Db {
       id INTEGER PRIMARY KEY,
       doc_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
       seq INTEGER NOT NULL,
-      content TEXT NOT NULL
+      content TEXT NOT NULL,
+      start_line INTEGER NOT NULL DEFAULT 1
     );
     CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(content, tokenize='trigram');
     CREATE TABLE IF NOT EXISTS meta (
@@ -31,7 +32,16 @@ export function openDb(path: string): Db {
       value TEXT NOT NULL
     );
   `);
+  ensureColumn(db, 'chunks', 'start_line', 'start_line INTEGER NOT NULL DEFAULT 1');
   return db;
+}
+
+/** Migration helper for databases created before a column existed. */
+function ensureColumn(db: Db, table: string, column: string, definition: string): void {
+  const columns = (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map(
+    (c) => c.name
+  );
+  if (!columns.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
 }
 
 export function getMeta(db: Db, key: string): string | null {

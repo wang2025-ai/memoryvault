@@ -1,8 +1,11 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { chunkText, extractTitle } from './chunk.js';
 import { ensureVecTable, setMeta, vecTableExists, type Db } from './db.js';
+import { extractFromFile, normalizeJsonText } from './extract.js';
+import { chunkText, extractTitle } from './chunk.js';
 import type { EmbeddingProvider } from './embeddings.js';
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
+export const DEFAULT_EXTS = 'md,markdown,txt,json,pdf,html,htm';
 
 export interface AddResult {
   docId: number;
@@ -34,11 +37,13 @@ export function upsertDocument(
         .prepare('INSERT INTO documents (source, title, chunks, added_at) VALUES (?, ?, ?, ?)')
         .run(opts.source, title, pieces.length, addedAt).lastInsertRowid
     );
-    const insertChunk = db.prepare('INSERT INTO chunks (doc_id, seq, content) VALUES (?, ?, ?)');
+    const insertChunk = db.prepare(
+      'INSERT INTO chunks (doc_id, seq, content, start_line) VALUES (?, ?, ?, ?)'
+    );
     const insertFts = db.prepare('INSERT INTO chunks_fts (rowid, content) VALUES (?, ?)');
-    pieces.forEach((content, seq) => {
-      const row = insertChunk.run(id, seq, content);
-      insertFts.run(Number(row.lastInsertRowid), content);
+    pieces.forEach((piece, seq) => {
+      const row = insertChunk.run(id, seq, piece.content, piece.startLine);
+      insertFts.run(Number(row.lastInsertRowid), piece.content);
     });
     return id;
   })();
@@ -58,6 +63,32 @@ export function removeDocument(db: Db, docId: number): void {
     }
     db.prepare('DELETE FROM documents WHERE id = ?').run(docId);
   })();
+}
+
+export interface DocRef {
+  id: number;
+  source: string;
+  title: string;
+}
+
+/** Resolve a CLI reference to a document: numeric id, exact source, or source suffix. */
+export function findDocRef(db: Db, ref: string): DocRef | undefined {
+  if (/^\d+$/.test(ref)) {
+    const byId = db.prepare('SELECT id, source, title FROM documents WHERE id = ?').get(Number(ref)) as
+      | DocRef
+      | undefined;
+    if (byId) return byId;
+  }
+  const exact = db.prepare('SELECT id, source, title FROM documents WHERE source = ?').get(ref) as
+    | DocRef
+    | undefined;
+  if (exact) return exact;
+  const escaped = ref.replace(/([\\%_])/g, '\\$1');
+  return db
+    .prepare(
+      "SELECT id, source, title FROM documents WHERE source LIKE '%' || ? ESCAPE '\\' ORDER BY id LIMIT 1"
+    )
+    .get(escaped) as DocRef | undefined;
 }
 
 /**
@@ -121,6 +152,14 @@ export function listFiles(dir: string, exts: string[], recursive: boolean): stri
   return out;
 }
 
+export function parseExts(exts?: string): string[] {
+  return (exts ?? DEFAULT_EXTS)
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+    .map((e) => (e.startsWith('.') ? e : `.${e}`));
+}
+
 export interface IndexSummary {
   indexed: number;
   skipped: number;
@@ -134,34 +173,17 @@ export async function indexFolder(
   folder: string,
   opts: { exts?: string; recursive?: boolean } = {}
 ): Promise<IndexSummary> {
-  const exts = (opts.exts ?? 'md,markdown,txt,json')
-    .split(',')
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean)
-    .map((e) => (e.startsWith('.') ? e : `.${e}`));
+  const exts = parseExts(opts.exts);
   const files = listFiles(folder, exts, opts.recursive !== false);
   const summary: IndexSummary = { indexed: 0, skipped: 0, failed: 0, embedded: 0 };
   for (const file of files) {
-    let raw: string;
     try {
-      raw = readFileSync(file, 'utf8');
-    } catch {
-      summary.failed++;
-      continue;
-    }
-    if (!raw.trim()) {
-      summary.skipped++;
-      continue;
-    }
-    let text = raw;
-    if (file.toLowerCase().endsWith('.json')) {
-      try {
-        text = JSON.stringify(JSON.parse(raw), null, 1);
-      } catch {
-        text = raw;
+      const extracted = await extractFromFile(file);
+      const text = file.toLowerCase().endsWith('.json') ? normalizeJsonText(extracted.text) : extracted.text;
+      if (!text.trim()) {
+        summary.skipped++;
+        continue;
       }
-    }
-    try {
       const result = upsertDocument(db, { source: file, text });
       if (provider) summary.embedded += await embedPending(db, provider, result.docId);
       summary.indexed++;

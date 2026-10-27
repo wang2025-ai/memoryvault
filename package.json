@@ -1,6 +1,6 @@
 {
   "name": "memoryvault",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local-first personal memory layer for your AI — MCP server over your own notes and documents. 本地优先的 AI 个人记忆层。",
   "type": "module",
   "license": "MIT",
@@ -39,6 +39,7 @@
     "better-sqlite3": "^12.0.0",
     "commander": "^12.0.0",
     "sqlite-vec": "^0.1.6",
+    "unpdf": "^1.9.1",
     "zod": "^3.24.0"
   },
   "devDependencies": {
