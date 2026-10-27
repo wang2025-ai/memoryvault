@@ -4,6 +4,10 @@
   "description": "Local-first personal memory layer for your AI — MCP server over your own notes and documents. 本地优先的 AI 个人记忆层。",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wang2025-ai/dadebox.git"
+  },
   "engines": {
     "node": ">=20"
   },
