@@ -21,8 +21,8 @@ Requires Node.js 20+.
 
 ```bash
 # from a clone of this repo (npm package name TBD before launch)
-git clone https://github.com/wang2025-ai/dadebox.git
-cd dadebox
+git clone https://github.com/wang2025-ai/memoryvault.git
+cd memoryvault
 npm install && npm run build
 
 # 1. initialize the vault (~/.memoryvault)
